@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from transcriber import (
-    Engine, MEDIA_EXTENSIONS, Transcript, WHISPER_MODEL, local_media, make_srt, preferred_device,
+    Engine, MEDIA_EXTENSIONS, Transcript, WHISPER_MODEL, iter_srt, local_media, preferred_device,
     save_batch, save_export, youtube_url,
 )
 from local_token import load_token, save_token
@@ -140,6 +140,7 @@ class Window(QMainWindow):
         self.resize(1040, 870)
         self.setMinimumSize(440, 560)
         self.source = None
+        self.result_source = None
         self.paths = {}
         self.result = None
         self.result_name = ""
@@ -430,6 +431,7 @@ class Window(QMainWindow):
     def run(self, sources, folder):
         self.busy = True
         self.is_batch = folder is not None
+        self.result_source = sources[0] if not self.is_batch and isinstance(sources[0], Path) else None
         self.used_cpu_fallback = False
         self.result = None
         self.output.clear()
@@ -480,19 +482,23 @@ class Window(QMainWindow):
         self.sync_buttons()
 
     def export(self, extension):
-        content = self.result.text if extension == "txt" else make_srt(self.result.words)
         name, _ = QFileDialog.getSaveFileName(
             self, "Salvar transcrição", f"{self.result_name}.{extension}",
             f"Arquivo {extension.upper()} (*.{extension})",
         )
         if not name:
             return
+        path = Path(name)
+        if path.suffix.lower() != f".{extension}":
+            QMessageBox.warning(self, "Extensão inválida", f"Escolha um arquivo .{extension}.")
+            return
+        content = self.result.text if extension == "txt" else iter_srt(self.result.words)
         try:
-            save_export(Path(name), content, replace=True)
+            save_export(path, content, replace=True, source=self.result_source)
         except OSError as error:
             QMessageBox.warning(self, "Erro ao salvar arquivo", str(error))
         else:
-            self.status.setText(f"Arquivo salvo · {Path(name).name}")
+            self.status.setText(f"Arquivo salvo · {path.name}")
 
     def closeEvent(self, event):
         if self.busy:
