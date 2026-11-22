@@ -1,3 +1,5 @@
+param([switch]$CpuOnly)
+
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 $python = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
@@ -6,14 +8,20 @@ $env:PATH = "$(Split-Path -Parent $python);$env:SystemRoot\System32;$env:SystemR
 $env:PYINSTALLER_CONFIG_DIR = Join-Path $PSScriptRoot 'build\.pyinstaller-cache'
 $gpuPackages = Join-Path $PSScriptRoot '.venv\Lib\site-packages\nvidia'
 $gpuComponents = 'cublas', 'cuda_nvrtc', 'cuda_runtime', 'cudnn'
-foreach ($component in $gpuComponents) {
-    if (-not (Test-Path -LiteralPath (Join-Path $gpuPackages "$component\bin") -PathType Container)) {
-        throw 'Instale requirements-build.txt para empacotar o suporte à GPU.'
+$distPath = 'dist'
+if ($CpuOnly) {
+    $distPath = 'dist\portable'
+} else {
+    foreach ($component in $gpuComponents) {
+        if (-not (Test-Path -LiteralPath (Join-Path $gpuPackages "$component\bin") -PathType Container)) {
+            throw 'Instale requirements-build.txt para empacotar o suporte à GPU.'
+        }
     }
 }
 
 & $python -m PyInstaller --noconfirm --onedir --windowed --name Transcritor `
-    --specpath build --workpath 'build\package' --distpath dist `
+    --specpath build --workpath 'build\package' --distpath $distPath `
+    --exclude-module hf_xet `
     --add-data "$(Join-Path $PSScriptRoot 'theme.qss'):." `
     --collect-all faster_whisper --collect-all huggingface_hub `
     --collect-all sherpa_onnx --collect-all yt_dlp --collect-all yt_dlp_ejs `
@@ -22,6 +30,7 @@ foreach ($component in $gpuComponents) {
     --copy-metadata sherpa-onnx-core --copy-metadata yt-dlp-ejs `
     app.py
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+if ($CpuOnly) { return }
 
 $gpuBundle = Join-Path $PSScriptRoot 'dist\Transcritor\_internal\nvidia'
 foreach ($component in $gpuComponents) {

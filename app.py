@@ -1,27 +1,9 @@
 """Windows desktop entry point."""
 
 from dataclasses import dataclass
-import faulthandler
-import logging
 from os import environ
 from pathlib import Path
 import sys
-
-
-def configure_diagnostics():
-    folder = Path(environ.get("LOCALAPPDATA", Path.home())) / "Transcritor"
-    folder.mkdir(parents=True, exist_ok=True)
-    stream = (folder / "transcritor.log").open("a", encoding="utf-8", buffering=1)
-    if sys.stdout is None:
-        sys.stdout = stream
-    if sys.stderr is None:
-        sys.stderr = stream
-    logging.basicConfig(
-        level=logging.INFO, stream=stream, format="%(asctime)s %(levelname)s %(message)s"
-    )
-    faulthandler.enable(file=stream)
-    logging.info("Iniciando %s", sys.executable)
-    return stream
 
 
 from PySide6.QtCore import QObject, Qt, QThread, Signal, Slot
@@ -37,6 +19,7 @@ from transcriber import (
     Engine, MEDIA_EXTENSIONS, Transcript, WHISPER_MODEL, local_media, make_srt, preferred_device,
     save_batch, save_export, youtube_url,
 )
+from local_token import load_token, save_token
 
 
 MEDIA_FILTER = "Áudio e vídeo (" + " ".join(f"*{ext}" for ext in sorted(MEDIA_EXTENSIONS)) + ")"
@@ -85,7 +68,6 @@ class Worker(QObject):
             prefix = f"{index}/{len(job.sources)} · " if job.folder else ""
 
             def status(message):
-                logging.info("%s%s — %s", prefix, label, message)
                 self.status.emit(f"{prefix}{label} — {message}")
 
             def update(text, progress):
@@ -109,7 +91,6 @@ class Worker(QObject):
                 exported = save_batch(job.folder, name, result, job.timestamps)
                 self.log.emit(f"{label} · Salvo como {exported}")
             except Exception as error:
-                logging.exception("Falha em %s", label)
                 detail = str(error).strip() or type(error).__name__
                 if not job.folder:
                     self.log.emit(detail)
@@ -280,8 +261,9 @@ class Window(QMainWindow):
         self.diarization.setToolTip("Organiza os trechos por voz e baixa os modelos no primeiro uso.")
         status_layout.addWidget(self.diarization)
         self.speaker_settings = QWidget()
-        speaker_row = QHBoxLayout(self.speaker_settings)
-        speaker_row.setContentsMargins(0, 0, 0, 0)
+        speaker_layout = QVBoxLayout(self.speaker_settings)
+        speaker_layout.setContentsMargins(0, 0, 0, 0)
+        speaker_row = QHBoxLayout()
         speaker_label = QLabel("&Número de falantes")
         self.speaker_count = QSpinBox()
         self.speaker_count.setRange(0, 99)
@@ -291,6 +273,22 @@ class Window(QMainWindow):
         speaker_row.addWidget(speaker_label)
         speaker_row.addWidget(self.speaker_count)
         speaker_row.addStretch()
+        speaker_layout.addLayout(speaker_row)
+        token_row = QHBoxLayout()
+        self.hf_token = QLineEdit()
+        self.hf_token.setEchoMode(QLineEdit.EchoMode.Password)
+        self.hf_token.setAccessibleName("Token do Hugging Face")
+        self.hf_token.setPlaceholderText("Token do Hugging Face (opcional)")
+        self.hf_token.setToolTip("Para remover o token local, limpe o campo e clique em Salvar token.")
+        try:
+            self.hf_token.setText(load_token())
+        except (OSError, UnicodeError):
+            self.hf_token.setPlaceholderText("Token indisponível. Salve um novo token.")
+        self.hf_token.returnPressed.connect(self.store_hf_token)
+        self.save_hf_token = button("Salvar token", self.store_hf_token)
+        token_row.addWidget(self.hf_token, 1)
+        token_row.addWidget(self.save_hf_token)
+        speaker_layout.addLayout(token_row)
         self.speaker_settings.hide()
         self.diarization.toggled.connect(self.speaker_settings.setVisible)
         status_layout.addWidget(self.speaker_settings)
@@ -346,7 +344,7 @@ class Window(QMainWindow):
         idle = not self.busy
         for widget in (
             self.language, self.browse, self.url, self.add_files, self.add_folder,
-            self.timestamps, self.diarization, self.speaker_count,
+            self.timestamps, self.diarization, self.speaker_count, self.hf_token, self.save_hf_token,
         ):
             widget.setEnabled(idle)
         ready = idle and not self.initializing
@@ -364,6 +362,19 @@ class Window(QMainWindow):
             self.source_label.setText(self.source.name)
             self.source_label.setToolTip(name)
             self.sync_buttons()
+
+    def store_hf_token(self):
+        token = self.hf_token.text().strip()
+        if token and (not token.startswith("hf_") or not token[3:].isascii() or not token[3:].isalnum()):
+            QMessageBox.warning(self, "Token inválido", "Cole um token de leitura do Hugging Face (hf_…).")
+            return
+        try:
+            save_token(token)
+        except OSError:
+            QMessageBox.warning(self, "Token", "Não foi possível atualizar o arquivo local do token.")
+            return
+        self.hf_token.setText(token)
+        self.status.setText("Token salvo neste computador." if token else "Token removido deste computador.")
 
     def choose_link(self):
         if not self.use_link.isEnabled():
@@ -494,6 +505,14 @@ class Window(QMainWindow):
 
 
 def main():
+    environ.update({
+        "DO_NOT_TRACK": "1",
+        "HF_HUB_DISABLE_TELEMETRY": "1",
+        "HF_HUB_DISABLE_IMPLICIT_TOKEN": "1",
+        "HF_HUB_DISABLE_XET": "1",
+        "DENO_NO_UPDATE_CHECK": "1",
+        "OTEL_DENO": "false",
+    })
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     app.setFont(QFont("Segoe UI", 10))
@@ -513,5 +532,4 @@ def main():
 
 
 if __name__ == "__main__":
-    diagnostics = configure_diagnostics()
     raise SystemExit(main())

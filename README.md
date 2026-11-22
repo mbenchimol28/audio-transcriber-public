@@ -21,7 +21,11 @@ Marque **Identificar falantes (diarização local)** antes de transcrever. Escol
 
 Os rótulos aparecem no resultado, no TXT e no SRT quando a exportação de legendas estiver habilitada. A numeração recomeça a cada arquivo. Quando uma palavra fica fora dos trechos reconhecidos como fala, o aplicativo a marca como **Falante não identificado**. Vozes sobrepostas ou muito parecidas podem receber rótulos imprecisos.
 
-O áudio é analisado no computador, em CPU. No primeiro uso, o aplicativo baixa aproximadamente 41 MB de pesos públicos, sem exigir conta ou token. O cache permite usos posteriores offline com arquivos locais. [Segmentação pyannote 3.0](https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0) · [Modelo de voz 3D-Speaker](https://huggingface.co/csukuangfj/speaker-embedding-models/blob/main/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx)
+O áudio é analisado no computador, em CPU. No primeiro uso, o aplicativo baixa aproximadamente 41 MB de pesos públicos. O cache permite usos posteriores offline com arquivos locais. [Segmentação pyannote 3.0](https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0) · [Modelo de voz 3D-Speaker](https://huggingface.co/csukuangfj/speaker-embedding-models/blob/main/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx)
+
+Em **Identificar falantes**, você pode preencher **Token do Hugging Face** e clicar em **Salvar token**. O campo é opcional para os modelos públicos. Use um token de leitura. Ele é armazenado em `%LOCALAPPDATA%\Transcritor\huggingface.dpapi`, protegido pela conta do Windows, e reaparece mascarado ao reabrir o aplicativo. Para removê-lo, limpe o campo e clique em **Salvar token**. Cada pessoa deve usar seu próprio token.
+
+O aplicativo desativa a telemetria do Hugging Face e do Deno. A transcrição e a diarização processam a mídia localmente. As conexões externas são usadas para baixar modelos ou para obter áudio quando você fornece um link do YouTube. O token salvo é usado apenas nas solicitações de modelos de diarização ao Hugging Face.
 
 ## Executar a partir do código-fonte
 
@@ -48,6 +52,8 @@ Com as dependências de execução instaladas no ambiente virtual, instale as de
 .\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
 ```
+
+Para gerar o pacote portátil sem as bibliotecas NVIDIA, acrescente `-CpuOnly` à última linha. O executável fica em `dist\portable\Transcritor\Transcritor.exe`. Distribua a pasta inteira.
 
 ## Verificar
 
