@@ -1,64 +1,68 @@
-# Transcritor
+# Audio Transcriber
 
-Aplicativo para Windows 10/11 x64 que transcreve áudio e vídeo no computador. A interface em português aceita uma mídia por vez, vídeo público do YouTube ou uma fila de arquivos. Exporta TXT e, quando selecionado, SRT com uma entrada por palavra.
+**Transcreva áudio e vídeo no Windows, com identificação de falantes e legendas por palavra.**
 
-## Abrir o executável
+O processamento roda no computador com Whisper Large-v3. Abra uma gravação, cole o link de um vídeo público do YouTube ou monte uma fila de arquivos. A interface e os resultados estão disponíveis em português.
 
-Gere o executável seguindo a seção [Gerar o executável](#gerar-o-executável). A pasta `build` contém arquivos intermediários de compilação. O executável dentro dela depende da montagem final em `dist`.
+[Executar no Windows](#executar-no-windows) · [Identificar falantes](#identificar-falantes) · [Gerar um executável](#gerar-um-executável)
 
-Abra `dist\Transcritor\Transcritor.exe`. Ao copiar o programa para outro local, leve a pasta `Transcritor` inteira, incluindo `_internal`. O pacote já inclui o Python, CUDA 12 e cuDNN 9. A aceleração requer uma GPU NVIDIA e um driver compatível.
+![Janela do Audio Transcriber com fila de arquivos, diarização ativada e uma transcrição de demonstração com dois falantes](docs/interface.png)
 
-Para usar os modelos já armazenados em `.venv\hf`, inicie pelo PowerShell na pasta do projeto.
+*Interface do aplicativo com dados de demonstração.*
 
-```powershell
-$env:HF_HOME = Join-Path $PWD '.venv\hf'
-.\dist\Transcritor\Transcritor.exe
-```
+| O que você pode fazer | Como funciona |
+| --- | --- |
+| Transcrever uma gravação | Abra um arquivo local ou cole o link de um vídeo público do YouTube. |
+| Processar uma fila | Adicione arquivos individualmente ou pelo primeiro nível de uma pasta. Escolha onde salvar os resultados. |
+| Separar falantes | Use a detecção automática ou indique o número de vozes. Os rótulos aparecem no resultado e nos arquivos exportados. |
+| Exportar a transcrição | Salve em TXT ou habilite SRT para obter marcações de tempo por palavra. |
 
-## Identificar falantes
+## Executar no Windows
 
-Marque **Identificar falantes (diarização local)** antes de transcrever. Escolha **Automático** ou informe a quantidade de vozes, se souber. No lote, um número fixo vale para todos os arquivos.
-
-Os rótulos aparecem no resultado, no TXT e no SRT quando a exportação de legendas estiver habilitada. A numeração recomeça a cada arquivo. Quando uma palavra fica fora dos trechos reconhecidos como fala, o aplicativo a marca como **Falante não identificado**. Vozes sobrepostas ou muito parecidas podem receber rótulos imprecisos.
-
-O áudio é analisado no computador, em CPU. No primeiro uso, o aplicativo baixa aproximadamente 41 MB de pesos públicos. O cache permite usos posteriores offline com arquivos locais. [Segmentação pyannote 3.0](https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0) · [Modelo de voz 3D-Speaker](https://huggingface.co/csukuangfj/speaker-embedding-models/blob/main/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx)
-
-Em **Identificar falantes**, você pode preencher **Token do Hugging Face** e clicar em **Salvar token**. O campo é opcional para os modelos públicos. Use um token de leitura. Ele é armazenado em `%LOCALAPPDATA%\Transcritor\huggingface.dpapi`, protegido pela conta do Windows, e reaparece mascarado ao reabrir o aplicativo. Para removê-lo, limpe o campo e clique em **Salvar token**. Cada pessoa deve usar seu próprio token.
-
-O aplicativo desativa a telemetria do Hugging Face e do Deno. A transcrição e a diarização processam a mídia localmente. As conexões externas são usadas para baixar modelos ou para obter áudio quando você fornece um link do YouTube. O token salvo é usado apenas nas solicitações de modelos de diarização ao Hugging Face.
-
-## Executar a partir do código-fonte
-
-Instale o Python 3.12 x64 e execute estes comandos no PowerShell, na pasta do projeto.
+Requer **Windows 10 ou 11 x64** e **Python 3.12 x64**. No PowerShell:
 
 ```powershell
+git clone https://github.com/mbenchimol28/audio-transcriber-public.git
+cd audio-transcriber-public
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe app.py
 ```
 
-Se o ambiente virtual já estiver instalado, execute apenas a última linha. Para reaproveitar os modelos armazenados em `.venv\hf`, rode primeiro `$env:HF_HOME = Join-Path $PWD '.venv\hf'`.
+O primeiro uso baixa o [Whisper Large-v3](https://huggingface.co/Systran/faster-whisper-large-v3). Depois que os modelos estiverem em cache, você pode transcrever arquivos locais offline.
 
-- **Whisper Large-v3.** O aplicativo usa este modelo tanto na GPU quanto na CPU. O primeiro uso baixa os pesos. Arquivos locais podem ser transcritos offline depois que o modelo estiver em cache. [Modelo no Hugging Face](https://huggingface.co/Systran/faster-whisper-large-v3)
-- **GPU NVIDIA.** A transcrição usa primeiro a GPU com precisão `int8_float16`. Se CUDA estiver indisponível ou falhar durante uma tarefa, o aplicativo usa o mesmo modelo em CPU com `int8` e mostra a troca na interface. Uma nova tarefa verifica a GPU novamente. A diarização roda na CPU. [Requisitos do faster-whisper](https://github.com/SYSTRAN/faster-whisper#gpu)
-- **YouTube.** Instale Deno 2.3 ou superior, ou Node.js 22 ou superior, e deixe o executável no PATH. Cole um link individual, clique em **Usar link** e depois em **Transcrever**. A mídia temporária é removida quando a tarefa termina. [Requisitos do yt-dlp](https://github.com/yt-dlp/yt-dlp#dependencies)
-- **Lotes.** Adicione arquivos ou escolha uma pasta. A fila inclui as mídias no primeiro nível. **Iniciar lote** pede o destino e grava os resultados conforme avança.
+- **GPU NVIDIA.** Com CUDA 12, cuDNN 9 e driver compatível, o app usa a GPU. Se a aceleração estiver indisponível ou falhar, a transcrição continua na CPU. [Requisitos de GPU](https://github.com/SYSTRAN/faster-whisper#gpu)
+- **YouTube.** Instale Deno 2.3+ ou Node.js 22+ e deixe o executável no PATH. A mídia temporária é removida ao terminar. [Requisitos do yt-dlp](https://github.com/yt-dlp/yt-dlp#dependencies)
 
-## Gerar o executável
+## Identificar falantes
 
-Com as dependências de execução instaladas no ambiente virtual, instale as dependências de empacotamento e rode o script. As bibliotecas NVIDIA desse ambiente também habilitam a GPU ao rodar pelo código-fonte.
+1. Marque **Identificar falantes (diarização local)**.
+2. Escolha **Automático** ou informe o número de vozes. No processamento em lote, um número fixo vale para todos os arquivos.
+3. Inicie a transcrição. A numeração de falantes recomeça a cada arquivo.
+
+A diarização roda na CPU e baixa aproximadamente 41 MB de modelos públicos na primeira execução. Vozes sobrepostas ou parecidas podem receber rótulos imprecisos. [Segmentação pyannote](https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0) · [Modelo 3D-Speaker](https://huggingface.co/csukuangfj/speaker-embedding-models/blob/main/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx)
+
+O token de leitura do Hugging Face é opcional. Se quiser usá-lo, preencha o campo e clique em **Salvar token**. O Windows protege o arquivo `%LOCALAPPDATA%\Transcritor\huggingface.dpapi` com a conta do usuário. Para apagar o token salvo, limpe o campo e clique em **Salvar token** novamente.
+
+## Gerar um executável
+
+Com o ambiente virtual já preparado, instale as dependências de empacotamento e execute:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-Para gerar o pacote portátil sem as bibliotecas NVIDIA, acrescente `-CpuOnly` à última linha. O executável fica em `dist\portable\Transcritor\Transcritor.exe`. Distribua a pasta inteira.
+Abra `dist\Transcritor\Transcritor.exe`. Para mover o aplicativo, copie a pasta `Transcritor` inteira, incluindo `_internal`.
 
-## Verificar
+Para compilar sem empacotar as bibliotecas NVIDIA, acrescente `-CpuOnly` ao comando do script. O resultado fica em `dist\portable\Transcritor`.
+
+## Privacidade e desenvolvimento
+
+A transcrição e a diarização são locais. O aplicativo desativa a telemetria do Hugging Face e do Deno. A conexão externa é usada para baixar modelos ou obter áudio de um link do YouTube fornecido por você.
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest -v
 ```
 
-Para comparar com outro transcritor, use a mesma máquina, mídia, modelo e configuração de SRT. Meça a primeira execução separadamente das execuções com o modelo carregado.
+O GitHub executa a análise estática de Python pelo CodeQL neste repositório. [Execuções do GitHub Actions](https://github.com/mbenchimol28/audio-transcriber-public/actions)
