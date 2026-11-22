@@ -4,7 +4,7 @@
 
 O processamento roda no computador com Whisper Large-v3. Abra uma gravação, cole o link de um vídeo público do YouTube ou monte uma fila de arquivos. A interface e os resultados estão disponíveis em português.
 
-[Executar no Windows](#executar-no-windows) · [Identificar falantes](#identificar-falantes) · [Gerar um executável](#gerar-um-executável)
+[Baixar código-fonte](https://github.com/mbenchimol28/audio-transcriber-public/releases/latest) · [Executar no Windows](#executar-no-windows) · [Identificar falantes](#identificar-falantes) · [Gerar um executável](#gerar-um-executável)
 
 ![Janela do Audio Transcriber com fila de arquivos, diarização ativada e uma transcrição de demonstração com dois falantes](docs/interface.png)
 
@@ -28,6 +28,8 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe app.py
 ```
+
+Se você baixou o ZIP na aba [Releases](https://github.com/mbenchimol28/audio-transcriber-public/releases), extraia o arquivo, abra a pasta extraída no PowerShell e comece pelo comando que cria o ambiente virtual.
 
 O primeiro uso baixa o [Whisper Large-v3](https://huggingface.co/Systran/faster-whisper-large-v3). Depois que os modelos estiverem em cache, você pode transcrever arquivos locais offline.
 
