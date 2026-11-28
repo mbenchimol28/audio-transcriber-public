@@ -1,10 +1,10 @@
 """Local inference, media inputs and exports for the desktop app."""
 
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from ctypes import WinDLL
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from itertools import groupby
-from os import add_dll_directory, environ, get_exec_path, pathsep
+from os import add_dll_directory, environ, fsync, get_exec_path, pathsep
 from pathlib import Path
 import re
 from shutil import which
@@ -16,10 +16,12 @@ from urllib.parse import parse_qs, urlsplit
 
 MEDIA_EXTENSIONS = frozenset(".wav .mp3 .m4a .flac .ogg .mp4 .mkv .mov .webm".split())
 WHISPER_MODEL = "large-v3"
+# Commit fixo de Systran/faster-whisper-large-v3 no Hugging Face.
+WHISPER_REVISION = "edaa852ec7e145841d8ffdb056a99866b5f0a478"
 _gpu_dll_directories = []
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Word:
     start: float
     end: float
@@ -42,22 +44,24 @@ def identify_speakers(transcript, turns):
     words, active = [], []
     index = 0
     for word in transcript.words:
-        active = [turn for turn in active if turn.end > word.start]
-        while index < len(turns) and turns[index].start < max(word.start + 0.001, word.end):
+        start, end = word.start, word.end
+        active = [turn for turn in active if turn.end > start]
+        cutoff = max(start + 0.001, end)
+        while index < len(turns) and turns[index].start < cutoff:
             turn = turns[index]
-            if turn.end > word.start:
+            if turn.end > start:
                 active.append(turn)
             index += 1
         speaker = "Falante não identificado"
         best_overlap = 0
         for turn in active:
-            overlap = min(word.end, turn.end) - max(word.start, turn.start)
+            overlap = min(end, turn.end) - max(start, turn.start)
             if overlap > best_overlap or (
-                best_overlap == 0 and word.start == word.end and turn.start <= word.start < turn.end
+                best_overlap == 0 and start == end and turn.start <= start < turn.end
             ):
                 speaker = names[turn.speaker]
                 best_overlap = max(overlap, 0.001)
-        words.append(replace(word, speaker=speaker))
+        words.append(Word(start, end, word.text, speaker))
 
     paragraphs = [
         f"{speaker}: {''.join(word.text for word in group).strip()}"
@@ -164,7 +168,9 @@ class Engine:
             status(f"Preparando Whisper {WHISPER_MODEL} (pode baixar os pesos no primeiro uso)…")
             self.model = self.model_device = None
             precision = "int8_float16" if self.device == "cuda" else "int8"
-            self.model = WhisperModel(WHISPER_MODEL, device=self.device, compute_type=precision)
+            self.model = WhisperModel(
+                WHISPER_MODEL, device=self.device, compute_type=precision, revision=WHISPER_REVISION
+            )
             self.model_device = self.device
         return self.model
 
@@ -253,60 +259,80 @@ def timestamp(seconds):
     return f"{hours:02}:{minute:02}:{second:02},{millis:03}"
 
 
-def make_srt(words):
-    cues = []
+def iter_srt(words):
+    number = 0
     for word in words:
         text = word.text.strip()
-        if text:
-            if word.speaker:
-                text = f"{word.speaker}: {text}"
-            end = max(word.end, max(0, word.start) + 0.001)
-            cues.append(
-                f"{len(cues) + 1}\n{timestamp(word.start)} --> {timestamp(end)}\n{text}\n\n"
-            )
-    return "".join(cues)
+        if not text:
+            continue
+        number += 1
+        if word.speaker:
+            text = f"{word.speaker}: {text}"
+        end = max(word.end, max(0, word.start) + 0.001)
+        yield f"{number}\n{timestamp(word.start)} --> {timestamp(end)}\n{text}\n\n"
 
 
-def save_export(path, content, *, replace):
-    # Stage the full export before touching its destination.
+def make_srt(words):
+    return "".join(iter_srt(words))
+
+
+@contextmanager
+def _stage_export(directory, content):
     staged = None
     try:
         with NamedTemporaryFile(
-            mode="w", encoding="utf-8", newline="\n", dir=path.parent, delete=False
+            mode="w", encoding="utf-8", newline="\n", dir=directory, delete=False
         ) as output:
             staged = Path(output.name)
-            output.write(content)
-        if replace:
-            staged.replace(path)
-        else:
-            staged.rename(path)  # Windows rename fails if the destination already exists.
+            if isinstance(content, str):
+                output.write(content)
+            else:
+                output.writelines(content)
+            output.flush()
+            fsync(output.fileno())
+        yield staged
     finally:
         if staged is not None:
             staged.unlink(missing_ok=True)
 
 
+def save_export(path, content, *, replace, source=None):
+    if source is not None:
+        try:
+            if path.samefile(source):
+                raise FileExistsError("O destino é a mídia original. Escolha outro arquivo.")
+        except FileNotFoundError:
+            pass
+
+    with _stage_export(path.parent, content) as staged:
+        if replace:
+            staged.replace(path)
+        else:
+            staged.rename(path)  # Windows rename fails if the destination already exists.
+
+
 def save_batch(directory, stem, transcript, timestamps):
-    suffix = 1
-    subtitles = make_srt(transcript.words) if timestamps else None
-    while True:
-        name = stem if suffix == 1 else f"{stem} ({suffix})"
-        text_file = directory / f"{name}.txt"
-        srt_file = directory / f"{name}.srt"
-        if not (text_file.exists() or srt_file.exists()):
-            try:
-                save_export(text_file, transcript.text, replace=False)
-            except FileExistsError:
-                suffix += 1
+    subtitles = _stage_export(directory, iter_srt(transcript.words)) if timestamps else nullcontext()
+    # Complete both writes before publishing either file.
+    with _stage_export(directory, transcript.text) as staged_text, subtitles as staged_srt:
+        suffix = 1
+        while True:
+            name = stem if suffix == 1 else f"{stem} ({suffix})"
+            suffix += 1
+            text_file = directory / f"{name}.txt"
+            srt_file = directory / f"{name}.srt"
+            if text_file.exists() or srt_file.exists():
                 continue
             try:
-                if subtitles is not None:
-                    save_export(srt_file, subtitles, replace=False)
+                staged_text.rename(text_file)
             except FileExistsError:
-                text_file.unlink()
-                suffix += 1
                 continue
-            except OSError:
-                text_file.unlink()
-                raise
-            return text_file.name
-        suffix += 1
+            try:
+                if staged_srt is not None:
+                    staged_srt.rename(srt_file)
+            except OSError as error:
+                text_file.rename(staged_text)
+                if not isinstance(error, FileExistsError):
+                    raise
+            else:
+                return text_file.name
