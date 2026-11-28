@@ -5,3 +5,7 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # O faster-whisper 1.2.1 chama av.open(metadata_errors=...), que o av 19 não aceita.
+      - dependency-name: av
+        update-types: ["version-update:semver-major"]
