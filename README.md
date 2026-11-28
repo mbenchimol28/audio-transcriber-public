@@ -34,7 +34,7 @@ Se você baixou o ZIP na aba [Releases](https://github.com/mbenchimol28/audio-tr
 O primeiro uso baixa o [Whisper Large-v3](https://huggingface.co/Systran/faster-whisper-large-v3). Depois que os modelos estiverem em cache, você pode transcrever arquivos locais offline.
 
 - **GPU NVIDIA.** Com CUDA 12, cuDNN 9 e driver compatível, o app usa a GPU. Se a aceleração estiver indisponível ou falhar, a transcrição continua na CPU. [Requisitos de GPU](https://github.com/SYSTRAN/faster-whisper#gpu)
-- **YouTube.** Instale Deno 2.3+ ou Node.js 22+ e deixe o executável no PATH. A mídia temporária é removida ao terminar. [Requisitos do yt-dlp](https://github.com/yt-dlp/yt-dlp#dependencies)
+- **YouTube.** Instale Deno 2.3+ ou Node.js 22+ e deixe o executável no PATH. A mídia temporária é removida ao terminar. [Requisitos do yt-dlp](https://github.com/yt-dlp/yt-dlp#dependencies) Use apenas conteúdo que você tem direito de baixar e transcrever, respeitando os [Termos de Serviço do YouTube](https://www.youtube.com/t/terms).
 
 ## Identificar falantes
 
@@ -61,7 +61,7 @@ Para compilar sem empacotar as bibliotecas NVIDIA, acrescente `-CpuOnly` ao coma
 
 ## Privacidade e desenvolvimento
 
-A transcrição e a diarização são locais. O aplicativo desativa a telemetria do Hugging Face e do Deno. A conexão externa é usada para baixar modelos ou obter áudio de um link do YouTube fornecido por você.
+A transcrição e a diarização são locais. O aplicativo desativa a telemetria do Hugging Face e do Deno. A conexão externa é usada para baixar modelos ou obter áudio de um link do YouTube fornecido por você. Os modelos são baixados em commits fixos do Hugging Face, então uma alteração nos repositórios de origem não muda o que o aplicativo executa.
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest -v
