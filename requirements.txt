@@ -1,6 +1,6 @@
 PySide6==6.10.2
 faster-whisper==1.2.1
-ctranslate2==4.6.3
+ctranslate2==4.9.1
 av==16.1.0
-yt-dlp[default]==2026.10.26
-sherpa-onnx==2.0.1
+yt-dlp[default]==2026.11.23
+sherpa-onnx==2.0.3
