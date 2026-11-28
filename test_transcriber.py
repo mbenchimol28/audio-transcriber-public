@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -90,6 +91,7 @@ class TranscriberTests(unittest.TestCase):
 
             self.assertEqual(list(directory.iterdir()), [])
 
+    @unittest.skipUnless(os.name == "nt", "Só o Windows recusa rename sobre um arquivo existente.")
     def test_batch_retries_when_another_writer_claims_the_subtitle(self):
         with tempfile.TemporaryDirectory() as folder:
             directory = Path(folder)

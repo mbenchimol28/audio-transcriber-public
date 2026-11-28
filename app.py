@@ -145,6 +145,7 @@ class Window(QMainWindow):
         self.result = None
         self.result_name = ""
         self.busy = False
+        self.saved_token = ""
         self.initializing = True
         self.is_batch = False
         self.used_cpu_fallback = False
@@ -282,7 +283,8 @@ class Window(QMainWindow):
         self.hf_token.setPlaceholderText("Token do Hugging Face (opcional)")
         self.hf_token.setToolTip("Para remover o token local, limpe o campo e clique em Salvar token.")
         try:
-            self.hf_token.setText(load_token())
+            self.saved_token = load_token()
+            self.hf_token.setText(self.saved_token)
         except (OSError, UnicodeError):
             self.hf_token.setPlaceholderText("Token indisponível. Salve um novo token.")
         self.hf_token.returnPressed.connect(self.store_hf_token)
@@ -368,14 +370,16 @@ class Window(QMainWindow):
         token = self.hf_token.text().strip()
         if token and (not token.startswith("hf_") or not token[3:].isascii() or not token[3:].isalnum()):
             QMessageBox.warning(self, "Token inválido", "Cole um token de leitura do Hugging Face (hf_…).")
-            return
+            return False
         try:
             save_token(token)
         except OSError:
             QMessageBox.warning(self, "Token", "Não foi possível atualizar o arquivo local do token.")
-            return
+            return False
+        self.saved_token = token
         self.hf_token.setText(token)
         self.status.setText("Token salvo neste computador." if token else "Token removido deste computador.")
+        return True
 
     def choose_link(self):
         if not self.use_link.isEnabled():
@@ -429,6 +433,13 @@ class Window(QMainWindow):
             self.run(tuple(self.paths.values()), Path(folder))
 
     def run(self, sources, folder):
+        # A diarização lê o token salvo; salve antes o que estiver digitado no campo.
+        if (
+            self.diarization.isChecked()
+            and self.hf_token.text().strip() != self.saved_token
+            and not self.store_hf_token()
+        ):
+            return
         self.busy = True
         self.is_batch = folder is not None
         self.result_source = sources[0] if not self.is_batch and isinstance(sources[0], Path) else None
