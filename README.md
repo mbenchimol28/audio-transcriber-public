@@ -68,3 +68,7 @@ A transcrição e a diarização são locais. O aplicativo desativa a telemetria
 ```
 
 O GitHub executa a análise estática de Python pelo CodeQL neste repositório. [Execuções do GitHub Actions](https://github.com/mbenchimol28/audio-transcriber-public/actions)
+
+## Licença
+
+Distribuído sob a [licença MIT](LICENSE). Os modelos Whisper, pyannote e 3D-Speaker e as bibliotecas usadas seguem as licenças dos respectivos projetos.
