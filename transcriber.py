@@ -16,6 +16,8 @@ from urllib.parse import parse_qs, urlsplit
 
 MEDIA_EXTENSIONS = frozenset(".wav .mp3 .m4a .flac .ogg .mp4 .mkv .mov .webm".split())
 WHISPER_MODEL = "large-v3"
+# Commit fixo de Systran/faster-whisper-large-v3 no Hugging Face.
+WHISPER_REVISION = "edaa852ec7e145841d8ffdb056a99866b5f0a478"
 _gpu_dll_directories = []
 
 
@@ -166,7 +168,9 @@ class Engine:
             status(f"Preparando Whisper {WHISPER_MODEL} (pode baixar os pesos no primeiro uso)…")
             self.model = self.model_device = None
             precision = "int8_float16" if self.device == "cuda" else "int8"
-            self.model = WhisperModel(WHISPER_MODEL, device=self.device, compute_type=precision)
+            self.model = WhisperModel(
+                WHISPER_MODEL, device=self.device, compute_type=precision, revision=WHISPER_REVISION
+            )
             self.model_device = self.device
         return self.model
 
