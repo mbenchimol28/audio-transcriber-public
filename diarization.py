@@ -6,13 +6,21 @@ import sherpa_onnx as sherpa
 from local_token import load_token
 
 
-def model_file(repo, name, token):
+# Commits fixos no Hugging Face: uma alteração no repositório de origem não muda o modelo usado.
+SEGMENTATION = ("csukuangfj/sherpa-onnx-pyannote-segmentation-3-0", "9403a6902bb58e3d5ae8c7e77c3422de279db2e0")
+EMBEDDING = ("csukuangfj/speaker-embedding-models", "a8055d6daef723a6a4ecf4de233708575bf4994f")
+
+
+def model_file(source, name, token):
+    repo, revision = source
     endpoint = "https://huggingface.co"
     try:
-        return hf_hub_download(repo, name, local_files_only=True, token=False, endpoint=endpoint)
+        return hf_hub_download(
+            repo, name, revision=revision, local_files_only=True, token=False, endpoint=endpoint
+        )
     except LocalEntryNotFoundError:
         try:
-            return hf_hub_download(repo, name, token=token or False, endpoint=endpoint)
+            return hf_hub_download(repo, name, revision=revision, token=token or False, endpoint=endpoint)
         except HfHubHTTPError as error:
             code = error.response.status_code if error.response is not None else None
             if code in (401, 403):
@@ -25,9 +33,9 @@ def load_diarizer(speaker_count):
         token = load_token()
     except (OSError, UnicodeError):
         raise RuntimeError("Não foi possível ler o token local do Hugging Face. Salve um novo token.") from None
-    segmentation = model_file("csukuangfj/sherpa-onnx-pyannote-segmentation-3-0", "model.int8.onnx", token)
+    segmentation = model_file(SEGMENTATION, "model.int8.onnx", token)
     embedding = model_file(
-        "csukuangfj/speaker-embedding-models",
+        EMBEDDING,
         "3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx",
         token,
     )
